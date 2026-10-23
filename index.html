@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Forja — Defesa a Vapor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#07090b;
+  --panel:rgba(14,17,19,.9);
+  --panel2:rgba(8,10,12,.94);
+  --line:rgba(233,184,114,.16);
+  --line2:rgba(233,184,114,.34);
+  --txt:#ece4d8;
+  --mut:#9a9184;
+  --brass:#e9b872;
+  --copper:#c8743a;
+  --molten:#ff6a2a;
+  --tesla:#2fe3b0;
+  --bad:#ff4a2a;
+  --shadow:0 24px 60px -22px rgba(0,0,0,.95);
+  --ease:cubic-bezier(.16,1,.3,1);
+  --cut:polygon(0 12px,12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--ink)}
+body{font-family:'Manrope',system-ui,sans-serif;color:var(--txt);-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
+canvas#c{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none}
+button{font-family:inherit}
+
+/* ── HUD: grade de 3 colunas sobre o canvas ── */
+#ui{
+  position:fixed;inset:0;z-index:5;pointer-events:none;
+  display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);grid-template-rows:auto 1fr auto;
+  gap:14px;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+}
+.hud{pointer-events:auto}
+/* sem backdrop-filter: borrar um canvas que muda todo quadro custa mais que a cena */
+.panel{
+  position:relative;
+  background:linear-gradient(170deg,var(--panel),var(--panel2));
+  border:1px solid var(--line);
+  box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.05);
+  clip-path:var(--cut);
+  opacity:0;transform:translateY(12px);
+  animation:rise .8s var(--ease) forwards;
+}
+.panel::before{content:"";position:absolute;left:0;top:0;height:2px;width:46px;background:linear-gradient(90deg,var(--brass),transparent)}
+.panel::after{content:"";position:absolute;right:8px;bottom:8px;width:8px;height:8px;border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);opacity:.8}
+@keyframes rise{to{opacity:1;transform:none}}
+.kick{font:800 9.5px/1.2 'Manrope';letter-spacing:.24em;text-transform:uppercase;color:var(--mut)}
+
+/* marca */
+.brand{grid-area:1/1;justify-self:start;display:flex;align-items:center;gap:12px;padding:10px 16px 10px 10px;animation-delay:.05s}
+.mark{width:42px;height:42px;flex:none;display:grid;place-items:center;border:1px solid var(--line2);
+  background:radial-gradient(circle at 50% 70%,#5a2410,#140a06 70%);clip-path:polygon(50% 0,100% 26%,100% 74%,50% 100%,0 74%,0 26%)}
+.mark svg{width:24px;height:24px;filter:drop-shadow(0 0 6px rgba(255,106,42,.8))}
+.brand h1{font:800 23px/.9 'Bricolage Grotesque';letter-spacing:-.04em;text-transform:uppercase}
+.brand h1 em{font-style:normal;color:var(--brass)}
+
+/* status central */
+.stats{grid-area:1/2;display:flex;gap:6px;padding:8px;animation-delay:.12s}
+.stat{min-width:96px;padding:8px 12px 9px;border:1px solid rgba(255,255,255,.06);background:linear-gradient(180deg,rgba(255,255,255,.035),transparent)}
+.stat .kick{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.stat .kick i{width:7px;height:7px;transform:rotate(45deg);background:currentColor;display:block}
+.stat b{display:block;font:800 25px/.9 'Bricolage Grotesque';letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.stat b small{font-size:13px;color:var(--mut);letter-spacing:0;margin-left:2px}
+.stat.wave .kick{color:var(--brass)} .stat.lives .kick{color:var(--molten)} .stat.gold .kick{color:#f5d27a}
+.stat.lives b{color:#ffd9c7}
+.stat .bar{height:3px;margin-top:7px;background:rgba(255,255,255,.08);overflow:hidden}
+.stat .bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--molten),#ffc08a);box-shadow:0 0 10px rgba(255,106,42,.8);transition:width .5s var(--ease)}
+.stat.pop b{animation:pop .5s cubic-bezier(.3,1.7,.5,1)}
+.stat.hurt{animation:hurt .5s}
+@keyframes pop{35%{transform:scale(1.25)}}
+@keyframes hurt{20%{background:rgba(255,74,42,.35);border-color:var(--bad)}}
+
+/* controles do topo direito */
+.sys{grid-area:1/3;justify-self:end;display:flex;align-items:center;gap:8px;padding:9px;animation-delay:.18s}
+.seg{position:relative;display:flex;padding:3px;background:rgba(255,255,255,.035);border:1px solid var(--line)}
+.seg button{position:relative;z-index:2;padding:8px 10px;border:0;background:none;cursor:pointer;font:800 9.5px/1 'Manrope';letter-spacing:.14em;text-transform:uppercase;color:var(--mut);transition:color .3s;white-space:nowrap}
+.seg button:hover{color:var(--txt)}
+.seg button.on{color:#140c05}
+.pill{position:absolute;z-index:1;top:3px;bottom:3px;left:3px;width:0;background:linear-gradient(180deg,#f6d29a,var(--brass));box-shadow:0 0 18px rgba(233,184,114,.4);transition:left .42s cubic-bezier(.6,.02,.2,1),width .42s cubic-bezier(.6,.02,.2,1)}
+.iconBtn{width:34px;height:34px;flex:none;display:grid;place-items:center;cursor:pointer;background:rgba(255,255,255,.03);border:1px solid var(--line);color:var(--mut);transition:all .25s var(--ease);font:800 10px/1 'Manrope';letter-spacing:.06em}
+.iconBtn:hover{color:var(--brass);border-color:var(--line2);background:rgba(233,184,114,.09);transform:translateY(-1px)}
+.iconBtn svg{width:15px;height:15px}
+.iconBtn.on{color:#140c05;background:var(--brass);border-color:transparent}
+
+/* barra de construção */
+.build{grid-area:3/2;align-self:end;display:flex;gap:8px;padding:10px;animation-delay:.26s}
+.card{
+  position:relative;width:118px;padding:10px 10px 9px;cursor:pointer;text-align:left;color:var(--txt);
+  border:1px solid rgba(255,255,255,.07);background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.2));
+  transition:transform .25s var(--ease),border-color .25s,background .25s,opacity .25s;overflow:hidden;
+}
+.card:hover{transform:translateY(-3px);border-color:var(--line2)}
+.card.on{border-color:var(--brass);background:linear-gradient(180deg,rgba(233,184,114,.18),rgba(233,184,114,.02));box-shadow:0 0 30px -10px rgba(233,184,114,.7)}
+.card.poor{opacity:.42}
+.card.poor .cost{color:var(--bad)}
+.card svg{width:34px;height:34px;display:block;margin-bottom:6px}
+.card .nm{display:block;font:800 13px/1.05 'Bricolage Grotesque';letter-spacing:-.02em}
+.card .cost{display:flex;align-items:center;gap:5px;margin-top:5px;font:800 11px/1 'Manrope';color:#f5d27a}
+.card .cost i{width:6px;height:6px;transform:rotate(45deg);background:currentColor}
+.card kbd{position:absolute;top:8px;right:8px;font:800 9px/1 'Manrope';padding:3px 5px;border:1px solid var(--line);color:var(--mut)}
+
+/* onda */
+.waveBox{grid-area:3/3;justify-self:end;align-self:end;padding:12px;width:250px;animation-delay:.32s}
+.waveBox .prev{font:600 11px/1.4 'Manrope';color:var(--mut);margin:6px 0 10px;min-height:16px}
+.waveBox .prev b{color:var(--txt)}
+button.act{
+  position:relative;width:100%;padding:13px 12px;border:1px solid transparent;cursor:pointer;
+  font:800 10.5px/1 'Manrope';letter-spacing:.17em;text-transform:uppercase;overflow:hidden;
+  background:linear-gradient(180deg,#ffb27a,var(--molten));color:#1a0904;
+  box-shadow:0 14px 30px -14px rgba(255,106,42,.95);
+  transition:transform .25s var(--ease),box-shadow .25s,filter .25s;
+}
+button.act::after{content:"";position:absolute;inset:0;transform:translateX(-101%);background:linear-gradient(90deg,rgba(255,255,255,.45),rgba(255,255,255,.05));transition:transform .45s var(--ease)}
+button.act:hover{transform:translateY(-2px)} button.act:hover::after{transform:none}
+button.act:active{transform:scale(.985)}
+button.act:disabled{filter:saturate(.2) brightness(.55);cursor:default;transform:none}
+button.act kbd{margin-left:8px;padding:2px 5px;font:800 9px/1 'Manrope';border:1px solid rgba(0,0,0,.3);background:rgba(0,0,0,.12)}
+button.act.ghost{background:rgba(255,255,255,.04);color:var(--txt);border-color:var(--line);box-shadow:none}
+button.act.ghost:hover{border-color:var(--line2)}
+button.act.ghost::after{background:linear-gradient(90deg,rgba(233,184,114,.18),rgba(233,184,114,.04))}
+
+/* inspeção de torre */
+.inspect{position:fixed;z-index:6;right:16px;top:50%;width:240px;padding:14px;transform:translate(24px,-50%);opacity:0;pointer-events:none;transition:opacity .35s,transform .45s var(--ease);animation:none}
+.inspect.show{opacity:1;transform:translate(0,-50%);pointer-events:auto}
+.inspect h3{font:800 20px/1 'Bricolage Grotesque';letter-spacing:-.03em;margin:6px 0 4px}
+.pips{display:flex;gap:4px;margin-bottom:12px}
+.pips i{width:22px;height:4px;background:rgba(255,255,255,.1)} .pips i.on{background:var(--brass);box-shadow:0 0 8px rgba(233,184,114,.7)}
+.rows{display:grid;grid-template-columns:1fr auto;gap:6px 10px;font:600 11.5px/1.2 'Manrope';color:var(--mut);margin-bottom:12px;padding:10px 0;border-top:1px dashed rgba(255,255,255,.1);border-bottom:1px dashed rgba(255,255,255,.1)}
+.rows b{color:var(--txt);font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.rows b em{font-style:normal;color:var(--tesla);margin-left:4px}
+.inspect .btns{display:grid;gap:7px}
+.inspect .x{position:absolute;right:10px;top:10px;width:24px;height:24px;border:1px solid var(--line);background:none;color:var(--mut);cursor:pointer}
+
+/* toast */
+.toast{position:fixed;left:50%;top:96px;z-index:8;transform:translate(-50%,-20px);opacity:0;pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 26px 16px;text-align:center;
+  background:linear-gradient(170deg,rgba(22,16,12,.95),rgba(10,8,6,.97));border:1px solid var(--line2);
+  box-shadow:0 30px 60px -26px #000,0 0 50px -16px rgba(255,106,42,.55);clip-path:var(--cut);
+  transition:opacity .45s,transform .5s var(--ease)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.modal{pointer-events:auto}
+.toast strong{font:800 clamp(24px,4vw,40px)/.95 'Bricolage Grotesque';letter-spacing:-.04em;text-transform:uppercase}
+.toast span{font:700 10.5px/1.4 'Manrope';letter-spacing:.2em;text-transform:uppercase;color:var(--mut)}
+.toast button{display:none;margin-top:8px;width:auto;padding:12px 18px}
+.toast.modal button{display:block}
+
+/* números flutuantes */
+.floater{position:fixed;left:0;top:0;z-index:4;pointer-events:none;font:800 13px/1 'Bricolage Grotesque';color:#f5d27a;text-shadow:0 0 10px rgba(245,210,122,.6),0 2px 4px #000;will-change:transform,opacity;opacity:0}
+
+/* dica de controles */
+.hint{position:fixed;left:16px;bottom:16px;z-index:4;font:700 9px/1.6 'Manrope';letter-spacing:.18em;text-transform:uppercase;color:rgba(154,145,132,.7);text-shadow:0 2px 8px #000;pointer-events:none}
+.hint b{color:var(--brass)}
+#fps{position:fixed;left:16px;top:84px;z-index:9;font:700 10px/1.4 ui-monospace,monospace;color:var(--tesla);background:rgba(0,0,0,.55);padding:6px 8px;display:none;white-space:pre}
+
+/* boot: some só quando fontes e shaders estão prontos */
+#boot{position:fixed;inset:0;z-index:20;display:grid;place-content:center;justify-items:center;gap:18px;
+  background:radial-gradient(circle at 50% 60%,#2a1209,#070504 70%);transition:opacity .8s .1s,visibility .8s .1s}
+#boot.gone{opacity:0;visibility:hidden}
+#boot h2{font:800 clamp(44px,10vw,96px)/.85 'Bricolage Grotesque';letter-spacing:-.06em;text-transform:uppercase}
+#boot h2 em{font-style:normal;color:var(--molten);text-shadow:0 0 40px rgba(255,106,42,.6)}
+#boot p{font:800 10px/1 'Manrope';letter-spacing:.42em;text-transform:uppercase;color:var(--mut)}
+#boot .bar{width:min(260px,60vw);height:2px;background:rgba(255,255,255,.08);overflow:hidden}
+#boot .bar i{display:block;height:100%;width:0;background:var(--molten);box-shadow:0 0 14px var(--molten);transition:width .4s var(--ease)}
+
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01s!important;transition-duration:.01s!important}}
+
+/* ── responsivo ── */
+@media (max-width:1100px){
+  .waveBox{width:200px}
+  .card{width:100px}
+  .hint{display:none}
+}
+@media (max-width:820px){
+  #ui{grid-template-columns:1fr auto;grid-template-rows:auto auto 1fr auto;gap:8px;padding:10px}
+  .brand{grid-area:1/1;padding:7px 10px 7px 7px;gap:8px}
+  .brand h1{font-size:17px} .mark{width:32px;height:32px} .brand .kick{display:none}
+  .sys{grid-area:1/2;padding:6px;gap:5px}
+  .sys .seg button{padding:7px 6px;font-size:8.5px;letter-spacing:.08em}
+  .stats{grid-area:2/1/3/-1;justify-self:stretch;padding:5px;gap:5px}
+  .stat{flex:1;min-width:0;padding:6px 8px}
+  .stat b{font-size:19px}
+  .build{grid-area:4/1/5/2;padding:6px;gap:5px;justify-self:stretch}
+  .card{flex:1;width:auto;padding:7px}
+  .card svg{width:24px;height:24px;margin-bottom:3px}
+  .card .nm{font-size:11px} .card kbd{display:none}
+  .waveBox{grid-area:4/2/5/3;width:118px;padding:8px}
+  .waveBox .prev,.waveBox .kick{display:none}
+  button.act{padding:12px 6px;font-size:9px;letter-spacing:.1em}
+  button.act kbd{display:none}
+  .inspect{top:auto;bottom:150px;right:10px;left:10px;width:auto;transform:translateY(20px)}
+  .inspect.show{transform:none}
+  .toast{top:140px;width:min(92vw,420px)}
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <header class="hud panel brand">
+    <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#ff8a4a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1 3 4 4.5 4 8.5a4 4 0 1 1-8 0c0-1.6.7-2.7 1.5-3.6.3 1.4 1 2.1 1.8 2.4C11 8 11 5.5 12 3z"/><path d="M5 21h14"/></svg></div>
+    <div>
+      <p class="kick">Defesa a vapor · Siderúrgica 07</p>
+      <h1>For<em>ja</em></h1>
+    </div>
+  </header>
+
+  <section class="hud panel stats">
+    <div class="stat wave"><p class="kick"><i></i>Onda</p><b id="sWave">0<small>/8</small></b></div>
+    <div class="stat lives" id="statLives"><p class="kick"><i></i>Fornalha</p><b id="sLives">20</b><div class="bar"><i id="livesBar"></i></div></div>
+    <div class="stat gold" id="statGold"><p class="kick"><i></i>Engrenagens</p><b id="sGold">0</b></div>
+  </section>
+
+  <section class="hud panel sys">
+    <div class="seg" id="segTime">
+      <span class="pill"></span>
+      <button data-v="auto" class="on" title="Ciclo automático (T)">Ciclo</button>
+      <button data-v="dia">Dia</button>
+      <button data-v="tarde">Tarde</button>
+      <button data-v="noite">Noite</button>
+    </div>
+    <button class="iconBtn" id="btnSpeed" title="Velocidade (F)">1×</button>
+    <button class="iconBtn" id="btnPause" title="Pausar (P)"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg></button>
+    <button class="iconBtn" id="btnSound" title="Som (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path id="w1" d="M15.5 8.5a5 5 0 0 1 0 7"/><path id="w2" d="M18.5 5.5a9 9 0 0 1 0 13"/></svg></button>
+  </section>
+
+  <section class="hud panel build" id="build">
+    <button class="card" data-t="cannon"><kbd>1</kbd>
+      <svg viewBox="0 0 40 40" fill="none" stroke-linejoin="round"><path d="M6 32h22l2-6H8z" fill="#2a3238" stroke="#e9b872" stroke-width="1.5"/><rect x="11" y="16" width="12" height="10" rx="2" fill="#c8743a"/><path d="M22 19h13v5H22z" fill="#5d676e" stroke="#e9b872" stroke-width="1.2"/><circle cx="12" cy="15" r="4" fill="#e9b872"/></svg>
+      <span class="nm">Canhão a Vapor</span><span class="cost"><i></i><span>100</span></span></button>
+    <button class="card" data-t="tesla"><kbd>2</kbd>
+      <svg viewBox="0 0 40 40" fill="none"><path d="M10 34h20l-2-5H12z" fill="#161b1f" stroke="#e9b872" stroke-width="1.5"/><path d="M17 29V14h6v15" fill="#2a3238"/><g stroke="#c8743a" stroke-width="2.2"><path d="M14 26h12M14 22h12M14 18h12"/></g><circle cx="20" cy="9" r="4.5" fill="#2fe3b0" style="filter:drop-shadow(0 0 4px #2fe3b0)"/><path d="M26 7l4-3-1 4 4-1" stroke="#2fe3b0" stroke-width="1.4"/></svg>
+      <span class="nm">Bobina Tesla</span><span class="cost"><i></i><span>150</span></span></button>
+    <button class="card" data-t="flame"><kbd>3</kbd>
+      <svg viewBox="0 0 40 40" fill="none"><rect x="6" y="20" width="18" height="13" rx="2" fill="#2a3238" stroke="#e9b872" stroke-width="1.5"/><rect x="9" y="25" width="12" height="3" fill="#ff6a2a" style="filter:drop-shadow(0 0 3px #ff6a2a)"/><path d="M15 20v-4h4v4M19 17h9" stroke="#5d676e" stroke-width="2.4"/><path d="M29 17c4-1 6 1 8-1-1 3-3 5-8 3z" fill="#ff8a3a"/></svg>
+      <span class="nm">Fornalha</span><span class="cost"><i></i><span>120</span></span></button>
+  </section>
+
+  <section class="hud panel waveBox">
+    <p class="kick">Próxima onda</p>
+    <p class="prev" id="wavePrev">—</p>
+    <button class="act" id="btnWave">Iniciar onda<kbd>Espaço</kbd></button>
+  </section>
+</div>
+
+<aside class="panel inspect" id="inspect">
+  <button class="x" id="iClose" aria-label="Fechar">×</button>
+  <p class="kick" id="iKick">Torre</p>
+  <h3 id="iName">—</h3>
+  <div class="pips" id="iPips"><i></i><i></i><i></i></div>
+  <div class="rows" id="iRows"></div>
+  <div class="btns">
+    <button class="act" id="btnUp">Melhorar · <span id="upCost">0</span><kbd>U</kbd></button>
+    <button class="act ghost" id="btnSell">Vender · <span id="sellVal">0</span><kbd>Del</kbd></button>
+  </div>
+</aside>
+
+<div class="toast" id="toast"><span id="tKick">—</span><strong id="tTitle">—</strong><span id="tMsg"></span><button class="act" id="tBtn">Recomeçar</button></div>
+<div id="floaters"></div>
+<p class="hint"><b>1 2 3</b> construir · <b>Arraste</b> orbitar · <b>Botão direito</b> mover · <b>Role</b> zoom · <b>Esc</b> cancelar</p>
+<div id="fps"></div>
+
+<div id="boot">
+  <h2>For<em>ja</em></h2>
+  <div class="bar"><i id="bootBar"></i></div>
+  <p id="bootTxt">Acendendo a fornalha</p>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

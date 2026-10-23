@@ -1,0 +1,15 @@
+{
+  "name": "forja-tower-defense",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tower defense 3D em Three.js — vertical slice com tema de fundição a vapor",
+  "type": "module",
+  "scripts": {
+    "start": "npx --yes serve -l 5173 .",
+    "shot": "node tools/shot.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.49.1",
+    "three": "0.160.0"
+  }
+}
